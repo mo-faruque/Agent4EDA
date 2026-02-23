@@ -2,15 +2,15 @@
 
 **End-to-end AI-powered ASIC design automation: RTL to GDSII to Tapeout**
 
-[![Original Paper](https://img.shields.io/badge/Original_Paper-MCP4EDA_(arXiv:2507.19570)-b31b1b.svg)](https://arxiv.org/abs/2507.19570)
-[![Original Repo](https://img.shields.io/badge/Original_Repo-NellyW8/mcp--EDA-lightgrey.svg)](https://github.com/NellyW8/mcp-EDA)
-[![Website](https://img.shields.io/badge/Website-agent4eda.com-blue)](http://www.agent4eda.com/)
+[![MCP4EDA Paper](https://img.shields.io/badge/MCP4EDA_Paper-arXiv:2507.19570-b31b1b.svg)](https://arxiv.org/abs/2507.19570)
+[![MCP4EDA Repo](https://img.shields.io/badge/MCP4EDA_Repo-NellyW8/mcp--EDA-lightgrey.svg)](https://github.com/NellyW8/mcp-EDA)
+[![MCP4EDA Website](https://img.shields.io/badge/MCP4EDA_Website-agent4eda.com-blue)](http://www.agent4eda.com/)
 
-> Built on top of [MCP4EDA](https://arxiv.org/abs/2507.19570), which provided 6 basic MCP tools with local tool installation. Agent4EDA extends it into a **fully containerized, end-to-end solution** with **Docker-based architecture**, **AutoTuner PPA optimization**, **DFT/signoff verification**, **ECO timing closure**, and **tapeout readiness scoring** — growing the toolset from 6 to **39 MCP tools**.
+> Built on top of [MCP4EDA](https://github.com/NellyW8/mcp-EDA), which provided 6 basic MCP tools with local tool installation. Agent4EDA extends it into a **fully containerized, end-to-end solution** with **Docker-based architecture**, **AutoTuner PPA optimization**, **DFT/signoff verification**, **ECO timing closure**, and **tapeout readiness scoring** — growing the toolset from 6 to **39 MCP tools**.
 
 Agent4EDA is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that gives AI assistants (Claude Desktop, Cursor IDE) full control over a professional EDA toolchain running inside Docker. Ask your AI to synthesize, simulate, place-and-route, optimize, verify, and tape out your chip designs — all through natural language.
 
-- [**Website**](http://www.agent4eda.com/) | [**Original Paper**](https://arxiv.org/abs/2507.19570)
+- [**MCP4EDA Website**](http://www.agent4eda.com/) | [**MCP4EDA Paper**](https://arxiv.org/abs/2507.19570)
 
 ## Demo (from original MCP4EDA)
 
