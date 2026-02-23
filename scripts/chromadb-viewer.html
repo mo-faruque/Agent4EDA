@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChromaDB Viewer - MCP4EDA</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 { color: #00d4ff; margin-bottom: 5px; }
+        .subtitle { color: #888; margin-bottom: 20px; }
+        .status { padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        .status.connected { background: #1e4620; border: 1px solid #2e7d32; }
+        .status.disconnected { background: #4a1515; border: 1px solid #c62828; }
+        .status.loading { background: #3d3d00; border: 1px solid #fbc02d; }
+        .collection {
+            background: #252540;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #3a3a5c;
+        }
+        .collection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .collection-name { font-size: 1.2em; color: #00d4ff; font-weight: bold; }
+        .collection-count {
+            background: #00d4ff;
+            color: #1a1a2e;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+        .doc-types { margin: 10px 0; }
+        .doc-type {
+            display: inline-block;
+            background: #3a3a5c;
+            padding: 3px 8px;
+            border-radius: 3px;
+            margin-right: 5px;
+            font-size: 0.85em;
+        }
+        .documents { margin-top: 15px; }
+        .document {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5c;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .doc-meta { font-size: 0.85em; color: #888; margin-bottom: 5px; }
+        .doc-content {
+            font-family: monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 100px;
+            overflow-y: auto;
+            background: #0d0d1a;
+            padding: 8px;
+            border-radius: 3px;
+        }
+        button {
+            background: #00d4ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background: #00b8e6; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .controls { margin-bottom: 20px; }
+        input {
+            background: #252540;
+            border: 1px solid #3a3a5c;
+            color: #eee;
+            padding: 8px;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        .error { color: #ff6b6b; }
+        #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>ChromaDB Viewer</h1>
+    <p class="subtitle">MCP4EDA Vector Database Explorer</p>
+
+    <div class="controls">
+        <input type="text" id="chromaUrl" value="http://localhost:8000" placeholder="ChromaDB URL">
+        <button onclick="connect()">Connect</button>
+        <button onclick="refresh()" id="refreshBtn" disabled>Refresh</button>
+    </div>
+
+    <div id="status" class="status loading">Connecting...</div>
+
+    <div id="collections"></div>
+
+    <script>
+        let chromaUrl = 'http://localhost:8000';
+
+        async function connect() {
+            chromaUrl = document.getElementById('chromaUrl').value;
+            await refresh();
+        }
+
+        async function refresh() {
+            const statusEl = document.getElementById('status');
+            const collectionsEl = document.getElementById('collections');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            statusEl.className = 'status loading';
+            statusEl.textContent = 'Connecting to ChromaDB...';
+            collectionsEl.innerHTML = '';
+
+            try {
+                // Try v1 API first, then v2
+                let collections = [];
+                let apiVersion = 'v1';
+
+                try {
+                    const res = await fetch(`${chromaUrl}/api/v1/collections`);
+                    if (res.ok) {
+                        collections = await res.json();
+                    } else {
+                        throw new Error('v1 failed');
+                    }
+                } catch {
+                    // Try v2 API
+                    apiVersion = 'v2';
+                    const res = await fetch(`${chromaUrl}/api/v2/tenants/default_tenant/databases/default_database/collections`);
+                    if (res.ok) {
+                        collections = await res.json();
+                    } else {
+                        throw new Error('Cannot connect to ChromaDB');
+                    }
+                }
+
+                statusEl.className = 'status connected';
+                statusEl.textContent = `Connected to ChromaDB (API ${apiVersion}) - Found ${collections.length} collection(s)`;
+                refreshBtn.disabled = false;
+
+                if (collections.length === 0) {
+                    collectionsEl.innerHTML = '<p>No collections found. Run <code>npx tsx scripts/ingest-docs.ts</code> to populate.</p>';
+                    return;
+                }
+
+                for (const coll of collections) {
+                    await renderCollection(coll, apiVersion);
+                }
+
+            } catch (error) {
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = `Error: ${error.message}. Make sure ChromaDB is running: cd docker && docker compose up -d`;
+                refreshBtn.disabled = true;
+            }
+        }
+
+        async function renderCollection(coll, apiVersion) {
+            const collectionsEl = document.getElementById('collections');
+            const collName = coll.name;
+
+            const div = document.createElement('div');
+            div.className = 'collection';
+
+            // Get collection count and sample documents
+            let count = 0;
+            let docs = { ids: [], documents: [], metadatas: [] };
+
+            try {
+                if (apiVersion === 'v1') {
+                    const countRes = await fetch(`${chromaUrl}/api/v1/collections/${coll.id}/count`);
+                    count = await countRes.json();
+
+                    const docsRes = await fetch(`${chromaUrl}/api/v1/collections/${coll.id}/get`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ limit: 5, include: ['documents', 'metadatas'] })
+                    });
+                    docs = await docsRes.json();
+                } else {
+                    // v2 API
+                    const countRes = await fetch(`${chromaUrl}/api/v2/tenants/default_tenant/databases/default_database/collections/${coll.id}/count`);
+                    count = await countRes.json();
+
+                    const docsRes = await fetch(`${chromaUrl}/api/v2/tenants/default_tenant/databases/default_database/collections/${coll.id}/get`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ limit: 5, include: ['documents', 'metadatas'] })
+                    });
+                    docs = await docsRes.json();
+                }
+            } catch (e) {
+                console.error('Error fetching collection data:', e);
+            }
+
+            // Analyze doc types
+            const docTypes = {};
+            for (const meta of (docs.metadatas || [])) {
+                if (meta && meta.docType) {
+                    docTypes[meta.docType] = (docTypes[meta.docType] || 0) + 1;
+                }
+            }
+
+            div.innerHTML = `
+                <div class="collection-header">
+                    <span class="collection-name">${collName}</span>
+                    <span class="collection-count">${count} documents</span>
+                </div>
+                <div class="doc-types">
+                    ${Object.entries(docTypes).map(([type, n]) =>
+                        `<span class="doc-type">${type}: ${n}</span>`
+                    ).join('')}
+                </div>
+                <div class="documents">
+                    <strong>Sample Documents:</strong>
+                    ${(docs.documents || []).slice(0, 3).map((doc, i) => `
+                        <div class="document">
+                            <div class="doc-meta">
+                                ID: ${docs.ids[i]} |
+                                Source: ${docs.metadatas?.[i]?.source || 'N/A'} |
+                                Type: ${docs.metadatas?.[i]?.docType || 'N/A'}
+                            </div>
+                            <div class="doc-content">${escapeHtml(doc?.substring(0, 300) || 'No content')}...</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            collectionsEl.appendChild(div);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Auto-connect on load
+        window.onload = () => refresh();
+    </script>
+</body>
+</html>

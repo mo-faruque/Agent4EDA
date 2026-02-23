@@ -1,473 +1,673 @@
-# EDA Tools MCP Server
+# Agent4EDA (MCP4EDA v2)
 
-Implementation of the paper: [MCP4EDA: LLM-Powered Model Context Protocol RTL-to-GDSII Automation with Backend Aware Synthesis Optimization](https://arxiv.org/abs/2507.19570)
+**End-to-end AI-powered ASIC design automation: RTL to GDSII to Tapeout**
 
-A comprehensive Model Context Protocol (MCP) server that provides Electronic Design Automation (EDA) tools integration for AI assistants like Claude Desktop and Cursor IDE. This server enables AI to perform Verilog synthesis, simulation, ASIC design flows, and waveform analysis through a unified interface.
+[![Paper](https://img.shields.io/badge/arXiv-2507.19570-b31b1b.svg)](https://arxiv.org/abs/2507.19570)
+[![Website](https://img.shields.io/badge/Website-agent4eda.com-blue)](http://www.agent4eda.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-- [**Our Website**](http://www.agent4eda.com/)
+> Extended implementation of [MCP4EDA: LLM-Powered Model Context Protocol RTL-to-GDSII Automation with Backend Aware Synthesis Optimization](https://arxiv.org/abs/2507.19570), enhanced with **AutoTuner PPA optimization**, **DFT/signoff verification**, **ECO timing closure**, and **tapeout readiness scoring**.
+
+Agent4EDA is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that gives AI assistants (Claude Desktop, Cursor IDE) full control over a professional EDA toolchain running inside Docker. Ask your AI to synthesize, simulate, place-and-route, optimize, verify, and tape out your chip designs — all through natural language.
+
+- [**Website**](http://www.agent4eda.com/) | [**Paper**](https://arxiv.org/abs/2507.19570)
+
 ## Demo
 
 https://github.com/user-attachments/assets/65d8027e-7366-49b5-8f11-0430c1d1d3d6
 
-*EDA MCP Server demonstration showing Verilog synthesis, simulation, and ASIC design flow*
+*Agent4EDA demonstration showing Verilog synthesis, simulation, and ASIC design flow*
 
-## Features
+---
 
-- **Verilog Synthesis**: Synthesize Verilog code using Yosys for various FPGA targets (generic, ice40, xilinx)
-- **Verilog Simulation**: Simulate designs using Icarus Verilog with automated testbench execution
-- **Waveform Viewing**: Launch GTKWave for VCD file visualization and signal analysis
-- **ASIC Design Flow**: Complete RTL-to-GDSII flow using OpenLane with Docker integration
-- **Layout Viewing**: Open GDSII files in KLayout for physical design inspection
-- **Report Analysis**: Read and analyze OpenLane reports for PPA metrics and design quality assessment
+## What's New (v2 vs MCP4EDA)
 
-## Prerequisites
+| Capability | MCP4EDA (Paper) | Agent4EDA (This Repo) |
+|---|---|---|
+| Tools | 6 basic tools | **39 MCP tools** |
+| EDA Tools | Local install required | **All-in-Docker** (IIC-OSIC-TOOLS) |
+| PPA Optimization | Manual | **AutoTuner** with Bayesian optimization |
+| Signoff | None | **DRC, LVS, Timing, IR Drop, Antenna** |
+| Timing Closure | None | **ECO iterative optimization** |
+| Tapeout Readiness | None | **25+ point checklist with A-F grading** |
+| Documentation | Manual lookup | **RAG semantic search** (700+ chunks) |
+| Project Persistence | Temp files | **SQLite database** |
+| GUI Access | Local apps | **VNC in browser** (http://localhost:8888) |
 
-Before using this MCP server, you need to install the following EDA tools:
+---
 
-### 1. Yosys (Verilog Synthesis)
+## Architecture
 
-**macOS (Homebrew):**
-```bash
-brew install yosys
+```
+┌────────────────────────────────────────────────────────┐
+│              Claude Desktop / Cursor IDE                │
+│          "Synthesize this counter for sky130"           │
+└──────────────────────┬─────────────────────────────────┘
+                       │ MCP Protocol (stdio)
+                       ▼
+┌────────────────────────────────────────────────────────┐
+│              Agent4EDA MCP Server (Node.js)             │
+│                                                         │
+│  39 Tools: synthesis, simulation, openlane, autotuner, │
+│  signoff, ECO, tapeout, RAG search, project mgmt       │
+│                                                         │
+│  Modules: DockerManager | ProjectManager | Database    │
+│           RAG System | AutoTuner | SignoffChecker       │
+└──────┬──────────────────┬──────────────────┬───────────┘
+       │ docker exec      │ HTTP :8000       │ SQLite
+       ▼                  ▼                  ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
+│ EDA Container│  │   ChromaDB   │  │   mcp4eda.db     │
+│ (IIC-OSIC)   │  │ Vector Store │  │                  │
+│              │  │              │  │ projects, runs,  │
+│ Yosys        │  │ 700+ doc    │  │ files, ppa_metrics│
+│ Icarus       │  │ embeddings  │  └──────────────────┘
+│ OpenLane     │  └──────────────┘
+│ OpenROAD     │
+│ Magic/Netgen │
+│ KLayout      │
+│ AutoTuner    │
+│ VNC :8888    │
+└──────────────┘
 ```
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get update
-sudo apt-get install yosys
-```
+---
 
-**From Source:**
-```bash
-# Install prerequisites
-sudo apt-get install build-essential clang bison flex \
-    libreadline-dev gawk tcl-dev libffi-dev git \
-    graphviz xdot pkg-config python3 libboost-system-dev \
-    libboost-python-dev libboost-filesystem-dev zlib1g-dev
+## Features & Tools (39 Total)
 
-# Clone and build
-git clone https://github.com/YosysHQ/yosys.git
-cd yosys
-make -j$(nproc)
-sudo make install
-```
+### Synthesis & Simulation
+| Tool | Description |
+|------|-------------|
+| `synthesize_verilog` | Synthesize RTL using Yosys (targets: generic, ice40, xilinx, sky130) |
+| `simulate_verilog` | Simulate with Icarus Verilog, generates VCD waveforms |
 
-**Alternative - OSS CAD Suite (Recommended):**
-Download the complete toolchain from: https://github.com/YosysHQ/oss-cad-suite-build/releases
+### ASIC Design Flow (RTL-to-GDSII)
+| Tool | Description |
+|------|-------------|
+| `run_openlane` | Complete RTL-to-GDSII flow using OpenLane (sky130A, gf180mcuD, ihp-sg13g2) |
+| `run_optimized_openlane` | Run with AutoTuner-optimized parameters |
+| `read_openlane_reports` | Parse synthesis/placement/routing/signoff reports |
 
-### 2. Icarus Verilog (Simulation)
+### AutoTuner (PPA Optimization)
+| Tool | Description |
+|------|-------------|
+| `suggest_tuning_params` | AI analyzes design metrics and suggests optimal parameter ranges |
+| `generate_tuner_config` | Generate OpenROAD AutoTuner configuration |
+| `run_autotuner` | Execute Bayesian optimization (Hyperopt, Ax, Optuna, Nevergrad) |
+| `stop_autotuner` | Halt a running optimization |
+| `get_tuning_results` | Retrieve best configuration from completed tuning |
+| `list_tunable_parameters` | List 20+ tunable parameters with ranges and presets |
+| `quick_tuning_analysis` | Assess whether tuning would benefit a design |
 
-**macOS (Homebrew):**
-```bash
-brew install icarus-verilog
-```
+### Signoff & Verification
+| Tool | Description |
+|------|-------------|
+| `run_signoff_checks` | Run all 5 signoff checks in one call |
+| `run_drc_check` | Design Rule Check via Magic |
+| `run_lvs_check` | Layout vs Schematic via Netgen |
+| `run_timing_signoff` | Static timing analysis via OpenSTA |
+| `run_ir_drop_analysis` | Power integrity analysis via PDNSim |
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install iverilog
-```
+### ECO Timing Closure
+| Tool | Description |
+|------|-------------|
+| `run_eco_optimization` | Iterative timing closure (buffer insertion, gate sizing, Vt swap) |
+| `quick_timing_fix` | Single-pass timing repair |
+| `analyze_timing_violations` | Detailed violation path analysis |
+| `estimate_timing_closure` | Predict iterations needed with difficulty scoring |
 
-**Windows:**
-Download installer from: https://bleyer.org/icarus/
+### Tapeout Readiness
+| Tool | Description |
+|------|-------------|
+| `run_tapeout_checklist` | 25+ point checklist with GDS readiness score (0-100, A-F grade) |
+| `quick_readiness_check` | Fast critical-file verification |
+| `get_algorithm_info` | Browse 100+ OpenROAD algorithms |
+| `get_optimization_preset` | Get predefined configs (timing_closure, low_power, min_area, etc.) |
+| `recommend_search_algorithm` | Get AutoTuner algorithm recommendation for your design |
 
-### 3. GTKWave (Waveform Viewer)
+### Visualization
+| Tool | Description |
+|------|-------------|
+| `view_waveform` | Open VCD in GTKWave via VNC browser |
+| `view_gds` | Open GDSII in KLayout via VNC browser |
 
-**Direct Downloads (Recommended):**
-- **Windows:** Download from [SourceForge](https://sourceforge.net/projects/gtkwave/)
-- **macOS:** Download from [SourceForge](https://sourceforge.net/projects/gtkwave/) or use Homebrew: `brew install --cask gtkwave`
-- **Linux:** Download from [SourceForge](https://sourceforge.net/projects/gtkwave/) or use package manager: `sudo apt-get install gtkwave`
+### Documentation RAG Search
+| Tool | Description |
+|------|-------------|
+| `search_eda_docs` | Semantic search across 700+ documentation chunks |
+| `get_config_help` | Get help for any OpenLane/ORFS config variable |
+| `explain_eda_error` | Troubleshoot EDA error messages |
+| `get_autotuner_help` | AutoTuner parameter and optimization guidance |
+| `get_openlane_step_info` | Detailed info about any flow step |
+| `get_eda_topic_help` | Quick topic overviews (7 standard topics) |
+| `check_rag_status` | RAG system health check |
 
-**Alternative Installation Methods:**
-```bash
-# macOS (Homebrew)
-brew install --cask gtkwave
+### Project Management
+| Tool | Description |
+|------|-------------|
+| `list_projects` | List all projects with metadata |
+| `get_project` | Get project details (runs, files, PPA history) |
+| `delete_project` | Delete project and all associated files |
+| `check_docker_status` | Container status, tool versions, VNC availability |
+| `get_vnc_info` | Get VNC connection details |
 
-# Ubuntu/Debian
-sudo apt-get install gtkwave
+---
 
-# Build from source (all platforms)
-git clone https://github.com/gtkwave/gtkwave.git
-cd gtkwave
-meson setup build && cd build && meson install
-```
+## Quick Start
 
-### 4. Docker Desktop (Recommended for OpenLane)
+### Prerequisites
+- **Docker Desktop 4.39.0+** with Docker Compose
+- **Node.js 18+**
+- **OpenAI API key** (for RAG documentation search — optional)
 
-**Direct Downloads:**
-- **Windows:** [Download Docker Desktop for Windows](https://www.docker.com/products/docker-desktop)
-- **macOS:** [Download Docker Desktop for Mac](https://www.docker.com/products/docker-desktop) or `brew install --cask docker`
-- **Linux:** [Download Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/)
-
-**Installation:**
-1. Download and install Docker Desktop from the official website
-2. Launch Docker Desktop and ensure it's running
-3. Verify installation: `docker run hello-world`
-
-**Note:** Docker Desktop includes Docker Engine, Docker CLI, and Docker Compose in one package.
-
-### 5. OpenLane (ASIC Design Flow)
-
-**Simple Installation Method (Recommended):**
-
-```bash
-# Install OpenLane via pip
-pip install openlane
-
-# Pull the Docker image
-docker pull efabless/openlane:latest
-
-# Verify installation
-docker run hello-world
-```
-
-**Usage Example:**
-```bash
-# Create project directory
-mkdir -p ~/openlane-projects/my-design
-cd ~/openlane-projects/my-design
-
-# Create Verilog file (counter example)
-cat > counter.v << 'EOF'
-module counter (
-    input wire clk,
-    input wire rst,
-    output reg [7:0] count
-);
-    always @(posedge clk or posedge rst) begin
-        if (rst)
-            count <= 8'b0;
-        else
-            count <= count + 1;
-    end
-endmodule
-EOF
-
-# Create configuration file
-cat > config.json << 'EOF'
-{
-    "DESIGN_NAME": "counter",
-    "VERILOG_FILES": ["counter.v"],
-    "CLOCK_PORT": "clk",
-    "CLOCK_PERIOD": 10.0
-}
-EOF
-
-# Run the RTL-to-GDSII flow
-python3 -m openlane --dockerized config.json
-```
-
-**Key Benefits:**
-- The `--dockerized` flag handles all tool dependencies automatically via Docker
-
-### 6. KLayout (Layout Viewer)
-
-**Direct Downloads (Recommended):**
-- **Windows:** [Download KLayout for Windows](https://www.klayout.de/build.html)
-- **macOS:** [Download KLayout for macOS](https://www.klayout.de/build.html) or `brew install --cask klayout`
-- **Linux:** [Download KLayout for Linux](https://www.klayout.de/build.html) or `sudo apt install klayout`
-
-**Alternative Installation:**
-```bash
-# macOS (Homebrew)
-brew install --cask klayout
-
-# Ubuntu/Debian
-sudo apt install klayout
-```
-
-## Installation
-
-### 1. Clone and Build the MCP Server
+### 1. Clone & Build
 
 ```bash
-git clone https://github.com/NellyW8/mcp-EDA
+git clone https://github.com/NellyW8/mcp-EDA.git
 cd mcp-EDA
 npm install
 npm run build
-npx tsc   
 ```
 
-### 2. Project Structure
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env and set your OpenAI API key (optional, for RAG):
+# OPENAI_API_KEY=sk-proj-...
+```
+
+### 3. Start Docker Containers
+
+```bash
+docker-compose -f docker/docker-compose.yml up -d
+```
+
+This starts:
+- **mcp4eda** container — All EDA tools + VNC server
+- **chromadb** container — Vector database for documentation search
+
+Verify:
+```bash
+docker exec mcp4eda yosys --version
+docker exec mcp4eda iverilog -V
+```
+
+### 4. Connect to Claude Desktop
+
+Edit your Claude Desktop config:
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "eda-mcp": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-EDA/build/index.js"],
+      "env": {
+        "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin",
+        "HOME": "/your/home/directory"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop. You should see 39 tools available in the MCP tools menu.
+
+### 5. (Optional) Connect via Docker Desktop MCP Extension
+
+For the easiest setup:
+1. Install "Labs: AI Tools for Devs" extension in Docker Desktop
+2. Click gear icon > "MCP Clients" tab > Connect to Claude Desktop
+
+This auto-configures the Docker MCP bridge:
+```json
+{
+  "mcpServers": {
+    "MCP_DOCKER": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "alpine/socat", "STDIO", "TCP:host.docker.internal:8811"]
+    }
+  }
+}
+```
+
+### Cursor IDE Setup
+
+1. `Ctrl+Shift+P` > "Cursor Settings" > MCP
+2. Add MCP server with the same configuration as Claude Desktop above
+3. Enable the "eda-mcp" server
+
+---
+
+## Usage Examples
+
+### 1. Synthesize Verilog
+
+```
+"Synthesize this counter for ice40 FPGA"
+
+module counter(
+    input clk, input rst,
+    output reg [7:0] count
+);
+    always @(posedge clk or posedge rst)
+        if (rst) count <= 0;
+        else count <= count + 1;
+endmodule
+```
+
+### 2. Simulate with Testbench
+
+```
+"Simulate this adder with a testbench"
+
+module adder(input [3:0] a, b, output [4:0] sum);
+    assign sum = a + b;
+endmodule
+```
+
+### 3. Full ASIC Flow (RTL-to-GDSII)
+
+```
+"Run the complete ASIC flow for this design on sky130 with a 10ns clock"
+```
+
+Produces: GDSII layout, timing/power/area reports, DEF files, netlists
+
+### 4. Optimize PPA with AutoTuner
+
+```
+"The timing is failing. Can you tune the design parameters to close timing?"
+```
+
+The AI will:
+1. Analyze current PPA metrics
+2. Suggest parameter ranges
+3. Run Bayesian optimization (15-30 iterations)
+4. Apply the best configuration
+
+### 5. Run Signoff Checks
+
+```
+"Run all signoff checks on my design"
+```
+
+Runs DRC, LVS, timing, IR drop, and antenna checks in one call.
+
+### 6. Check Tapeout Readiness
+
+```
+"Is my design ready for tapeout?"
+```
+
+Returns a 25+ point checklist with a readiness score (0-100) and letter grade (A-F).
+
+### 7. ECO Timing Closure
+
+```
+"Fix the timing violations in my design"
+```
+
+Iteratively applies buffer insertion, gate sizing, and Vt swapping until timing closes.
+
+### 8. Search Documentation
+
+```
+"How do I configure clock tree synthesis in OpenLane?"
+```
+
+Semantically searches 700+ indexed documentation chunks and returns relevant answers.
+
+### 9. View Results in Browser
+
+```
+"Show me the GDS layout" or "View the simulation waveforms"
+```
+
+Opens GTKWave/KLayout in your browser via VNC at http://localhost:8888
+
+---
+
+## Project Structure
 
 ```
 mcp-EDA/
 ├── src/
-│   └── index.ts          # Main server code
-├── build/
-│   └── index.js          # Compiled JavaScript
+│   ├── index.ts                 # Main MCP server (39 tool handlers)
+│   ├── db/
+│   │   ├── database.ts          # SQLite operations
+│   │   └── schema.sql           # Database schema
+│   ├── docker/
+│   │   ├── docker-manager.ts    # Container lifecycle
+│   │   └── commands.ts          # Docker command wrappers
+│   ├── files/
+│   │   ├── file-manager.ts      # File I/O
+│   │   ├── project-manager.ts   # Project CRUD
+│   │   ├── path-resolver.ts     # Host <-> container path mapping
+│   │   └── cleanup.ts           # Cleanup utilities
+│   ├── tools/
+│   │   ├── synthesis.ts         # Yosys synthesis
+│   │   ├── simulation.ts        # Icarus Verilog simulation
+│   │   ├── openlane.ts          # OpenLane RTL-to-GDSII
+│   │   ├── viewers.ts           # GTKWave & KLayout via VNC
+│   │   ├── rag-tools.ts         # Documentation search tools
+│   │   ├── tuner-tools.ts       # AutoTuner optimization tools
+│   │   └── signoff-tools.ts     # Signoff & tapeout tools
+│   ├── rag/
+│   │   ├── embeddings.ts        # OpenAI embedding generation
+│   │   ├── vectorstore.ts       # ChromaDB operations
+│   │   ├── doc-loader.ts        # Documentation ingestion
+│   │   └── search.ts            # Semantic search interface
+│   ├── tuner/
+│   │   ├── config-generator.ts  # AutoTuner config generation
+│   │   ├── metrics-extractor.ts # PPA metrics parsing
+│   │   ├── ai-suggestions.ts    # AI-based parameter suggestions
+│   │   ├── autotuner-runner.ts  # ORFS AutoTuner execution
+│   │   ├── parameter-mapping.ts # ORFS parameter mapping
+│   │   └── orfs-setup.ts        # OpenROAD Flow Scripts setup
+│   ├── signoff/
+│   │   ├── signoff-checker.ts   # DRC, LVS, timing, IR drop, antenna
+│   │   ├── eco-optimizer.ts     # ECO timing closure loop
+│   │   ├── tapeout-checklist.ts # 25+ point tapeout readiness
+│   │   ├── algorithms.ts        # 100+ OpenROAD algorithm catalog
+│   │   └── autotuner-algorithms.ts  # Search algorithm definitions
+│   └── types/
+│       └── project.ts           # TypeScript interfaces
+├── docker/
+│   ├── Dockerfile               # Extended IIC-OSIC-TOOLS image
+│   └── docker-compose.yml       # Multi-container orchestration
+├── scripts/
+│   ├── ingest-docs.ts           # One-time RAG ingestion
+│   ├── health-check.sh          # Tool availability check
+│   └── view-chromadb.ts         # ChromaDB inspection
+├── projects/                    # User projects (volume mount)
+├── .env.example                 # Environment template
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
 
-## Configuration
+---
 
-###  Docker Desktop MCP Integration 
+## Design Flow
 
-This method uses Docker Desktop's built-in MCP extension for the easiest setup experience.
-
-#### Prerequisites
-- Docker Desktop 4.39.0+ installed and running
-- Claude Desktop installed
-
-#### Setup Steps
-
-1. **Install Docker Desktop Extension:**
-   - Launch Docker Desktop
-   - Go to "Extensions" from the left menu
-   - Search for "AI Tools" or "Docker MCP Toolkit"
-   - Install "Labs: AI Tools for Devs" extension
-
-2. **Configure Docker MCP Connection:**
-   - Open the installed "Labs: AI Tools for Devs" extension
-   - Click the gear icon in the upper right corner
-   - Select the "MCP Clients" tab
-   - Click "Connect" for "Claude Desktop" or "Cursor IDE"
-   
-   <img src="assets/docker.png" alt="Docker Setup" width="700">
-
-   This automatically configures Claude Desktop and Cursor IDE with:
-   ```json
-   {
-     "mcpServers": {
-       "MCP_DOCKER": {
-         "command": "docker",
-         "args": [
-           "run",
-           "-i",
-           "--rm",
-           "alpine/socat",
-           "STDIO",
-           "TCP:host.docker.internal:8811"
-         ]
-       }
-     }
-   }
-   ```
-
-### Cursor IDE Setup
-1. **Add Your EDA MCP Server:**
-   - Locate your Claude Desktop config file, Settings > Developer > Edit Config:
-     - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-     - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-   - Add your EDA server to the existing configuration:
-
-   ```json
-   {
-     "mcpServers": {
-       "MCP_DOCKER": {
-         "command": "docker",
-         "args": [
-           "run",
-           "-i",
-           "--rm",
-           "alpine/socat",
-           "STDIO",
-           "TCP:host.docker.internal:8811"
-         ]
-       },
-       "eda-mcp": {
-         "command": "node",
-         "args": [
-           "/absolute/path/to/your/eda-mcp-server/build/index.js"
-         ],
-         "env": {
-           "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin",
-           "HOME": "/your/home/directory"
-         }
-       }
-     }
-   }
-   ```
-
-2. **Restart Claude Desktop** and verify both servers are running in Settings > Developer.
-
-### Cursor IDE Setup
-
-1. **Open Cursor Settings:**
-   - Press `Ctrl + Shift + P` (Windows/Linux) or `Cmd + Shift + P` (macOS)
-   - Search for "Cursor Settings"
-   - Navigate to "MCP" in the sidebar
-
-2. **Add MCP Server:**
-   Click "Add new MCP server" and configure:
-
-   ```json
-    {
-     "mcpServers": {
-       "MCP_DOCKER": {
-         "command": "docker",
-         "args": [
-           "run",
-           "-i",
-           "--rm",
-           "alpine/socat",
-           "STDIO",
-           "TCP:host.docker.internal:8811"
-         ]
-       },
-       "eda-mcp": {
-         "command": "node",
-         "args": [
-           "/absolute/path/to/your/eda-mcp-server/build/index.js"
-         ],
-         "env": {
-           "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin",
-           "HOME": "/your/home/directory"
-         }
-       }
-     }
-   }
-   ```
-
-3. **Enable MCP Tools:**
-   - Go to Cursor Settings → MCP
-   - Enable the "eda-mcp" server
-   - You should see the server status change to "Connected"
-
-## Usage Examples
-
-### 1. Verilog Synthesis
+Agent4EDA supports the complete ASIC design pipeline:
 
 ```
-Ask Claude: "Can you synthesize this counter module for an ice40 FPGA?"
-
-module counter(
-    input clk,
-    input rst,
-    output [7:0] count
-);
-    reg [7:0] count_reg;
-    assign count = count_reg;
-    
-    always @(posedge clk or posedge rst) begin
-        if (rst)
-            count_reg <= 8'b0;
-        else
-            count_reg <= count_reg + 1;
-    end
-endmodule
+         RTL Design (Verilog)
+              │
+              ▼
+    ┌─────────────────────┐
+    │  1. SYNTHESIS        │  synthesize_verilog
+    │     Yosys            │  (generic, ice40, xilinx, sky130)
+    └─────────┬───────────┘
+              ▼
+    ┌─────────────────────┐
+    │  2. SIMULATION       │  simulate_verilog
+    │     Icarus Verilog   │  → VCD waveforms
+    └─────────┬───────────┘
+              ▼
+    ┌─────────────────────┐
+    │  3. ASIC FLOW        │  run_openlane
+    │     OpenLane/OpenROAD│  → GDSII + reports
+    └─────────┬───────────┘
+              ▼
+    ┌─────────────────────┐
+    │  4. PPA OPTIMIZATION │  run_autotuner
+    │     AutoTuner        │  Bayesian optimization
+    │     (15-30 iters)    │  → Best config
+    └─────────┬───────────┘
+              ▼
+    ┌─────────────────────┐
+    │  5. SIGNOFF          │  run_signoff_checks
+    │     DRC (Magic)      │
+    │     LVS (Netgen)     │
+    │     Timing (OpenSTA) │
+    │     IR Drop (PDNSim) │
+    └─────────┬───────────┘
+              ▼
+    ┌─────────────────────┐
+    │  6. ECO CLOSURE      │  run_eco_optimization
+    │     Buffer insertion │
+    │     Gate sizing      │
+    │     Vt swapping      │
+    └─────────┬───────────┘
+              ▼
+    ┌─────────────────────┐
+    │  7. TAPEOUT          │  run_tapeout_checklist
+    │     25+ checks       │
+    │     Readiness score  │
+    │     A-F grade        │
+    └─────────────────────┘
 ```
-
-### 2. Verilog Simulation
-
-```
-Ask Claude: "Please simulate this adder with a testbench"
-
-// Design
-module adder(
-    input [3:0] a,
-    input [3:0] b,
-    output [4:0] sum
-);
-    assign sum = a + b;
-endmodule
-
-// Testbench will be generated automatically or you can provide one
-```
-
-### 3. ASIC Design Flow
-
-```
-Ask Claude: "Run the complete ASIC flow for this design with a 10ns clock period"
-
-module simple_cpu(
-    input clk,
-    input rst,
-    input [7:0] data_in,
-    output [7:0] data_out
-);
-    // Your RTL design here
-endmodule
-```
-
-**What you get after completion:**
-- `runs/RUN_*/final/gds/design.gds` - Final GDSII layout
-- `runs/RUN_*/openlane.log` - Complete execution log  
-- `runs/RUN_*/reports/` - Timing, area, power analysis reports
-- All intermediate results (DEF files, netlists, etc.)
-
-### 4. Waveform Analysis
-
-```
-Ask Claude: "View the waveforms from the simulation with project ID: abc123"
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **MCP Server Not Detected:**
-   - Verify the absolute path in configuration
-   - Check that Node.js is installed and accessible
-   - Restart Claude Desktop/Cursor after configuration changes
-
-2. **Docker Permission Errors:**
-   ```bash
-   sudo groupadd docker
-   sudo usermod -aG docker $USER
-   sudo reboot
-   ```
-
-3. **Tool Not Found Errors:**
-   - Verify tools are installed: `yosys --version`, `iverilog -V`, `gtkwave --version`
-   - Check PATH environment variable in MCP configuration
-   - On macOS, ensure Homebrew paths are included: `/opt/homebrew/bin`
-
-4. **OpenLane Timeout:**
-   - The server has a 10-minute timeout for OpenLane flows
-   - For complex designs, consider simplifying or running multiple iterations
-
-5. **GTKWave/KLayout GUI Issues:**
-   - On macOS: GTKWave/KLayout may need manual approval in Security & Privacy settings
-   - On Linux: Ensure X11 forwarding is working if using remote systems
-   - On Windows: Ensure GUI applications can launch from command line
-
-### Debugging
-
-1. **Check MCP Server Logs:**
-   - **Claude Desktop:** `~/Library/Logs/Claude/mcp*.log` (macOS)
-   - **Cursor:** Check the MCP settings panel for error messages
-
-2. **Test Tools Manually:**
-   ```bash
-   yosys -help
-   iverilog -help
-   docker run hello-world
-   gtkwave --version
-   klayout -v
-   ```
-
-3. **Verify Node.js Environment:**
-   ```bash
-   node --version
-   npm --version
-   ```
-
-
-## Support
-
-For issues and questions:
-- Check the troubleshooting section above
-- Review MCP server logs
-- Test individual tools manually
-- Open an issue with detailed error messages and environment information
 
 ---
 
-**Note:** This MCP server requires local installation of EDA tools. The server acts as a bridge between AI assistants and your local EDA toolchain, enabling sophisticated hardware design workflows through natural language interaction.
+## AutoTuner Details
 
+### Tunable Parameters (20+)
 
+| Parameter | Range | Category |
+|-----------|-------|----------|
+| `CLOCK_PERIOD` | 5-20 ns | Timing |
+| `FP_CORE_UTIL` | 30-80% | Area |
+| `SYNTH_STRATEGY` | area/delay/mixed | Synthesis |
+| `PLACEMENT_DENSITY` | 0.5-0.9 | Placement |
+| `ROUTING_STRATEGY` | 0-14 | Routing |
+| `ROUTING_LAYER_ADJUST` | 0-2 | Routing |
+| + 14 more... | | |
+
+### Search Algorithms
+
+| Algorithm | Type | Iterations | Best For |
+|-----------|------|------------|----------|
+| **Hyperopt** | Bayesian (TPE) | ~15 | General use (recommended) |
+| **Ax** | Adaptive | ~20 | Large design spaces |
+| **Optuna** | TPE Sampler | ~15-20 | Similar to Hyperopt |
+| **Nevergrad** | Evolutionary | ~25 | Multimodal landscapes |
+| **Random** | Baseline | Any | Validation |
+
+### Optimization Presets
+
+| Preset | Focus | Iterations |
+|--------|-------|------------|
+| `TIMING_CLOSURE` | Fix timing violations | 30 |
+| `LOW_POWER` | Minimize power | 25 |
+| `MIN_AREA` | Minimize die area | 20 |
+| `DRC_CLEAN` | Fix DRC violations | 15 |
+| `SIGNOFF_READY` | Balance all metrics | 25 |
+
+---
+
+## Tapeout Readiness Scoring
+
+The `run_tapeout_checklist` tool evaluates 25+ items across 5 categories:
+
+| Category | Points | Checks |
+|----------|--------|--------|
+| Design Files | 20 | GDS, netlist, LEF/DEF present and valid |
+| DRC/LVS | 30 | Zero errors in Magic DRC, Netgen LVS |
+| Timing | 25 | WNS >= 0, TNS >= 0, no violations |
+| Power | 15 | Within spec, no hotspots |
+| Physical | 10 | Antenna, IR drop, slew clean |
+
+**Grades:** A (90-100) | B (80-89) | C (70-79) | D (60-69) | F (<60)
+
+---
+
+## Docker Stack
+
+### Containers
+
+| Service | Image | Ports | Purpose |
+|---------|-------|-------|---------|
+| `mcp4eda` | mcp4eda:latest (IIC-OSIC-TOOLS) | 8888 (VNC), 5901 | All EDA tools |
+| `chromadb` | chromadb/chroma:latest | 8000 | Vector database |
+
+### Included EDA Tools
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Yosys | 0.57 | RTL synthesis |
+| Icarus Verilog | 13.0 | Simulation |
+| OpenROAD | v2.0 | Place & route |
+| OpenLane | Latest | RTL-to-GDSII flow |
+| Magic | 8.3 | DRC, layout editing |
+| Netgen | Latest | LVS verification |
+| KLayout | Latest | Layout viewer |
+| OpenSTA | Latest | Static timing analysis |
+| AutoTuner (ORFS) | Latest | PPA optimization |
+
+### Supported PDKs
+
+- **sky130A** (SkyWater 130nm) - default
+- **gf180mcuD** (GlobalFoundries 180nm)
+- **ihp-sg13g2** (IHP 130nm SiGe BiCMOS)
+
+---
+
+## Database Schema
+
+SQLite database (`mcp4eda.db`) with 4 tables:
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `projects` | Project metadata | id, name, design_name, top_module |
+| `runs` | Execution history | project_id, run_type, status, config, results |
+| `files` | Generated artifacts | project_id, run_id, file_type, file_path |
+| `ppa_metrics` | PPA tracking | run_id, area_um2, power_mw, frequency_mhz, wns_ns, tns_ns |
+
+---
+
+## RAG Documentation Search
+
+The RAG system indexes 700+ documentation chunks from:
+- OpenLane 2 documentation
+- OpenROAD documentation
+- OpenROAD-flow-scripts (ORFS) guides
+- AutoTuner configuration references
+
+### One-time Ingestion
+
+```bash
+# Requires OPENAI_API_KEY in .env
+npx tsx scripts/ingest-docs.ts
+```
+
+Uses OpenAI `text-embedding-3-small` (1536-dim) embeddings stored in ChromaDB.
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | For RAG | — | OpenAI API key for embeddings |
+| `CHROMA_HOST` | No | localhost | ChromaDB host |
+| `CHROMA_PORT` | No | 8000 | ChromaDB port |
+| `DOCKER_CONTAINER_NAME` | No | mcp4eda | Docker container name |
+| `MCP4EDA_PROJECTS_DIR` | No | ./projects | Projects directory |
+| `MCP4EDA_DB_PATH` | No | ./mcp4eda.db | SQLite database path |
+
+---
+
+## Troubleshooting
+
+### Docker Issues
+
+```bash
+# Check container status
+docker ps -a | grep mcp4eda
+
+# View container logs
+docker logs mcp4eda
+
+# Verify tools
+docker exec mcp4eda yosys --version
+docker exec mcp4eda iverilog -V
+docker exec mcp4eda openroad -version
+
+# Restart containers
+docker-compose -f docker/docker-compose.yml restart
+```
+
+### MCP Connection Issues
+
+1. Verify the absolute path in Claude Desktop config
+2. Ensure Node.js 18+ is installed: `node --version`
+3. Check MCP logs: Settings > Developer > Show Logs (Claude Desktop)
+4. Restart Claude Desktop after config changes
+
+### Docker Permission Errors (Linux)
+
+```bash
+sudo groupadd docker
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### OpenLane Timeout
+
+The server has a 10-minute timeout for OpenLane flows. For complex designs, the AI will automatically suggest parameter adjustments or design simplifications.
+
+### VNC Not Loading
+
+- Ensure port 8888 is not in use: `lsof -i :8888`
+- Check VNC status: `docker exec mcp4eda ps aux | grep vnc`
+- Access directly: http://localhost:8888 (password: abc123)
+
+---
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build (TypeScript -> JavaScript)
+npm run build
+
+# Watch mode (auto-rebuild on changes)
+npm run dev
+
+# Run directly
+npm start
+```
+
+---
+
+## Contributing
+
+Contributions are welcome. Key areas for improvement:
+
+- Additional PDK support
+- More synthesis targets
+- Enhanced error recovery
+- Performance benchmarking
+- Integration test coverage
+- Additional documentation sources for RAG
+
+---
 
 ## Cite
+
 ```bibtex
 @misc{wang2025mcp4edallmpoweredmodelcontext,
-      title={MCP4EDA: LLM-Powered Model Context Protocol RTL-to-GDSII Automation with Backend Aware Synthesis Optimization}, 
+      title={MCP4EDA: LLM-Powered Model Context Protocol RTL-to-GDSII Automation with Backend Aware Synthesis Optimization},
       author={Yiting Wang and Wanghao Ye and Yexiao He and Yiran Chen and Gang Qu and Ang Li},
       year={2025},
       eprint={2507.19570},
       archivePrefix={arXiv},
       primaryClass={cs.AR},
-      url={https://arxiv.org/abs/2507.19570}, 
+      url={https://arxiv.org/abs/2507.19570},
 }
 ```
+
+---
+
+## License
+
+See [LICENSE](LICENSE) for details.

@@ -1,0 +1,76 @@
+services:
+  mcp4eda:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mcp4eda:latest
+    container_name: mcp4eda
+
+    # Enable interactive mode with VNC support
+    stdin_open: true
+    tty: true
+    # Use --vnc --wait to start VNC server for GUI tools (GTKWave, KLayout, Magic)
+    command: ["--vnc", "--wait"]
+
+    # Port mappings for VNC access
+    ports:
+      - "8888:80"     # noVNC web interface - access at http://localhost:8888
+      - "5901:5901"   # VNC direct connection (optional, for VNC clients)
+
+    # Volume mounts for persistent data
+    volumes:
+      # Project files - designs, outputs, reports
+      - ../projects:/workspace/projects
+
+      # ChromaDB vector database for RAG
+      - ../chroma-data:/workspace/chroma-data
+
+      # Cached documentation
+      - ../cache:/workspace/cache
+
+    # Environment variables
+    environment:
+      - PDK=sky130A
+      - PDK_ROOT=/foss/pdks
+      # OpenAI API key passed from host
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # ChromaDB connection
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+
+    # Resource limits (optional, adjust as needed)
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+    # Restart policy
+    restart: unless-stopped
+
+    depends_on:
+      - chromadb
+
+  # ChromaDB Vector Database Server
+  # Note: Using latest version to match chromadb npm client v2.4.x API
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"   # ChromaDB API
+    volumes:
+      - ../chroma-data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - ANONYMIZED_TELEMETRY=False
+      - ALLOW_RESET=true
+    restart: unless-stopped
+
+# Named volumes (alternative to bind mounts)
+# Uncomment if you prefer Docker-managed volumes
+# volumes:
+#   projects:
+#   chroma-data:
+#   cache:
