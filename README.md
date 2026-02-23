@@ -643,10 +643,26 @@ npm start
 
 ---
 
+## Status
+
+This project is under active development. We are currently working on:
+
+- **Better documentation** — Improving guides, examples, and inline docs
+- **Feature testing** — End-to-end test coverage for all 39 tools and workflow combinations
+
+### Roadmap
+
+Planned features for upcoming releases:
+
+- **DFT (Design for Test)** — Scan chain insertion, ATPG, test pattern generation
+- **JTAG** — Boundary scan integration and debug access port support
+- **Formal Verification** — Property checking, equivalence checking, and model checking
+
 ## Contributing
 
 Contributions are welcome. Key areas for improvement:
 
+- DFT, JTAG, and formal verification integration
 - Additional PDK support
 - More synthesis targets
 - Enhanced error recovery
