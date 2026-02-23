@@ -6,33 +6,37 @@
 [![Website](https://img.shields.io/badge/Website-agent4eda.com-blue)](http://www.agent4eda.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> Extended implementation of [MCP4EDA: LLM-Powered Model Context Protocol RTL-to-GDSII Automation with Backend Aware Synthesis Optimization](https://arxiv.org/abs/2507.19570), enhanced with **AutoTuner PPA optimization**, **DFT/signoff verification**, **ECO timing closure**, and **tapeout readiness scoring**.
+> Built on top of [MCP4EDA](https://arxiv.org/abs/2507.19570), which provided 6 basic MCP tools with local tool installation. Agent4EDA extends it into a **fully containerized, end-to-end solution** with **Docker-based architecture**, **AutoTuner PPA optimization**, **DFT/signoff verification**, **ECO timing closure**, and **tapeout readiness scoring** — growing the toolset from 6 to **39 MCP tools**.
 
 Agent4EDA is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that gives AI assistants (Claude Desktop, Cursor IDE) full control over a professional EDA toolchain running inside Docker. Ask your AI to synthesize, simulate, place-and-route, optimize, verify, and tape out your chip designs — all through natural language.
 
-- [**Website**](http://www.agent4eda.com/) | [**Paper**](https://arxiv.org/abs/2507.19570)
+- [**Website**](http://www.agent4eda.com/) | [**Original Paper**](https://arxiv.org/abs/2507.19570)
 
-## Demo
+## Demo (from original MCP4EDA)
 
 https://github.com/user-attachments/assets/65d8027e-7366-49b5-8f11-0430c1d1d3d6
 
-*Agent4EDA demonstration showing Verilog synthesis, simulation, and ASIC design flow*
+*Demo from the original [MCP4EDA project](https://github.com/NellyW8/mcp-EDA) showing Verilog synthesis, simulation, and ASIC design flow*
 
 ---
 
-## What's New (v2 vs MCP4EDA)
+## What's New (Agent4EDA vs MCP4EDA)
 
-| Capability | MCP4EDA (Paper) | Agent4EDA (This Repo) |
+The original [MCP4EDA](https://github.com/NellyW8/mcp-EDA) required users to install each EDA tool locally on their machine and provided 6 basic tools. Agent4EDA re-architects the entire system around **Docker containers**, adds full **signoff/tapeout verification**, and introduces **AI-driven PPA optimization** — making it a true end-to-end solution.
+
+| Capability | MCP4EDA (Original) | Agent4EDA (This Repo) |
 |---|---|---|
 | Tools | 6 basic tools | **39 MCP tools** |
-| EDA Tools | Local install required | **All-in-Docker** (IIC-OSIC-TOOLS) |
-| PPA Optimization | Manual | **AutoTuner** with Bayesian optimization |
-| Signoff | None | **DRC, LVS, Timing, IR Drop, Antenna** |
-| Timing Closure | None | **ECO iterative optimization** |
-| Tapeout Readiness | None | **25+ point checklist with A-F grading** |
-| Documentation | Manual lookup | **RAG semantic search** (700+ chunks) |
-| Project Persistence | Temp files | **SQLite database** |
-| GUI Access | Local apps | **VNC in browser** (http://localhost:8888) |
+| Architecture | Local tool install (no containers) | **Fully containerized** (IIC-OSIC-TOOLS Docker) |
+| Setup | Install Yosys, iverilog, OpenLane, etc. individually | **Single `docker-compose up`** — all tools included |
+| PPA Optimization | Manual parameter tuning | **AutoTuner** with Bayesian optimization (5 algorithms) |
+| Signoff | Not implemented | **DRC, LVS, Timing, IR Drop, Antenna** checks |
+| Timing Closure | Not implemented | **ECO iterative optimization** (buffer insertion, gate sizing, Vt swap) |
+| Tapeout Readiness | Not implemented | **25+ point checklist with A-F grading** |
+| Documentation | Manual lookup | **RAG semantic search** (700+ indexed chunks) |
+| Project Persistence | Temp files | **SQLite database** with PPA history tracking |
+| GUI Access | Local apps required | **VNC in browser** (http://localhost:8888) |
+| Reproducibility | Depends on local environment | **Deterministic** — same container everywhere |
 
 ---
 
