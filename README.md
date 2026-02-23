@@ -2,9 +2,9 @@
 
 **End-to-end AI-powered ASIC design automation: RTL to GDSII to Tapeout**
 
-[![Paper](https://img.shields.io/badge/arXiv-2507.19570-b31b1b.svg)](https://arxiv.org/abs/2507.19570)
+[![Original Paper](https://img.shields.io/badge/Original_Paper-MCP4EDA_(arXiv:2507.19570)-b31b1b.svg)](https://arxiv.org/abs/2507.19570)
+[![Original Repo](https://img.shields.io/badge/Original_Repo-NellyW8/mcp--EDA-lightgrey.svg)](https://github.com/NellyW8/mcp-EDA)
 [![Website](https://img.shields.io/badge/Website-agent4eda.com-blue)](http://www.agent4eda.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > Built on top of [MCP4EDA](https://arxiv.org/abs/2507.19570), which provided 6 basic MCP tools with local tool installation. Agent4EDA extends it into a **fully containerized, end-to-end solution** with **Docker-based architecture**, **AutoTuner PPA optimization**, **DFT/signoff verification**, **ECO timing closure**, and **tapeout readiness scoring** — growing the toolset from 6 to **39 MCP tools**.
 
@@ -656,7 +656,19 @@ Contributions are welcome. Key areas for improvement:
 
 ---
 
+## Acknowledgments
+
+Agent4EDA is built on top of the original **MCP4EDA** project. We gratefully acknowledge the foundational work by the original authors:
+
+- **Original Paper:** [MCP4EDA: LLM-Powered Model Context Protocol RTL-to-GDSII Automation with Backend Aware Synthesis Optimization](https://arxiv.org/abs/2507.19570)
+- **Original Repository:** [NellyW8/mcp-EDA](https://github.com/NellyW8/mcp-EDA)
+- **Original Authors:** Yiting Wang, Wanghao Ye, Yexiao He, Yiran Chen, Gang Qu, Ang Li
+
+Agent4EDA extends their work by adding Docker containerization, AutoTuner PPA optimization, signoff/ECO verification, tapeout readiness scoring, and RAG-based documentation search.
+
 ## Cite
+
+If you use this work, please cite the original MCP4EDA paper:
 
 ```bibtex
 @misc{wang2025mcp4edallmpoweredmodelcontext,
@@ -669,9 +681,3 @@ Contributions are welcome. Key areas for improvement:
       url={https://arxiv.org/abs/2507.19570},
 }
 ```
-
----
-
-## License
-
-See [LICENSE](LICENSE) for details.
